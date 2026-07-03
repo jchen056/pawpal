@@ -1,15 +1,55 @@
 classDiagram
-    %% Replace the placeholders below with your actual classes, attributes, methods, and relationships.
+    %% PawPal+ initial UML design (4 classes: Owner, Pet, Task, Scheduler)
     %% Keep this file updated so it matches your final implementation.
 
-    class ClassName {
-        +type attribute
-        +method() returnType
+    class Owner {
+        +str name
+        +str preferences
+        +int available_time
+        +list~Pet~ pets
+        +add_pet(pet Pet) void
+        +all_tasks() list~Task~
+        +pending_tasks() list~Task~
     }
 
-    class AnotherClass {
-        +type attribute
-        +method() returnType
+    class Pet {
+        +str name
+        +str species
+        +str breed
+        +list~Task~ tasks
+        +add_task(task Task) void
+        +pending_tasks() list~Task~
     }
 
-    ClassName --> AnotherClass : relationship
+    class Task {
+        +str description
+        +int duration
+        +str recurrence
+        +str priority
+        +bool completed
+        +Pet pet
+        +is_recurring() bool
+        +priority_rank() int
+        +mark_done() void
+    }
+
+    class Plan {
+        +list~Task~ scheduled
+        +list~Task~ skipped
+        +total_minutes() int
+        +skipped_high_priority() list~Task~
+    }
+
+    class Scheduler {
+        +int time_budget
+        +sort_tasks(tasks list~Task~) list~Task~
+        +filter_tasks(tasks list~Task~, budget int) tuple
+        +generate_plan(owner Owner) Plan
+    }
+
+    Owner "1" --> "0..*" Pet : has
+    Pet "1" --> "0..*" Task : has
+    Task "0..*" --> "0..1" Pet : belongs to
+    Scheduler ..> Owner : uses
+    Scheduler ..> Plan : produces
+    Plan "1" --> "0..*" Task : contains

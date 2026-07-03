@@ -4,13 +4,22 @@
 
 **a. Initial design**
 
-- Briefly describe your initial UML design.
-- What classes did you include, and what responsibilities did you assign to each?
+My initial UML had four classes, each with a single clear responsibility:
+
+- **Owner** — the user of the app. Holds their `preferences` and `available_time` for the day, plus the lists of `pets` and `tasks`. Responsible for managing its own data (`add_task`, `edit_task`, `add_pet`).
+- **Pet** — a simple data holder for a pet's `name`, `species`, and `breed`. It has no behavior; it exists so tasks and plans can refer to a specific animal.
+- **Task** — one care activity (walk, feeding, meds). Knows its `duration`, `priority`, and `recurrence`, and can report `is_recurring()` and its numeric `priority_rank()` for sorting.
+- **Scheduler** — the "brains." Deliberately kept separate from `Owner` so the scheduling logic could be unit-tested on its own. It sorts tasks by priority, filters them against a time budget, and produces the day's plan (`generate_plan`).
+
+The core relationships were: an Owner *has* many Pets and many Tasks, and the Scheduler *uses* an Owner to produce a plan.
 
 **b. Design changes**
 
-- Did your design change during implementation?
-- If yes, describe at least one change and why you made it.
+Yes — two changes came out of reviewing the first implementation:
+
+1. **Tasks now belong to a Pet.** Originally `Task` and `Pet` both lived under `Owner` but had no connection to each other, so in a multi-pet household there was no way to tell whose walk or feeding a task was. I moved the task list onto `Pet` (via `Pet.add_task`, which sets a back-reference on the task) and had `Owner` expose everything through `all_tasks()` / `pending_tasks()`. This makes the ownership chain Owner → Pet → Task explicit, and I also added a `completed` flag with `mark_done()` so finished tasks drop out of the plan.
+
+2. **The scheduler no longer silently drops tasks.** My first `filter_tasks` returned only the tasks that fit the budget and threw the rest away, which meant an important task could disappear with no signal. I changed it to return both the *scheduled* and *skipped* tasks, and introduced a small **Plan** class to carry that result (plus helpers like `total_minutes()` and `skipped_high_priority()`). This keeps the "highest priority first" behavior while making it visible when a high-priority task can't fit, so the UI can warn the user instead of hiding the problem.
 
 ---
 
