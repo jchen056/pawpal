@@ -94,9 +94,12 @@ if owner.pets:
     if st.session_state.get("last_spawn"):
         st.success("🔁 " + st.session_state.pop("last_spawn"))
 
-    # Show each pet's tasks, each with a "Done" button.
-    # Completing a daily/weekly task auto-creates its next occurrence
-    # (via Task.complete), so we rerun to pick up the newly added task.
+    # --- Filter controls (backed by the Scheduler's filter methods) --------
+    scheduler = Scheduler()
+    f1, f2 = st.columns(2)
+    pet_filter = f1.selectbox("Filter by pet", ["All pets"] + [p.name for p in owner.pets])
+    status_filter = f2.selectbox("Show", ["All", "Pending", "Completed"])
+
     def task_label(task: Task) -> str:
         return (
             f"[{task.priority.upper()}] {task.description} — {task.duration} min"
@@ -105,18 +108,34 @@ if owner.pets:
             + (f" · due {task.due_date}" if task.due_date else "")
         )
 
-    for p_idx, pet in enumerate(owner.pets):
+    # Show each pet's tasks (filtered by status, sorted chronologically), each
+    # with a "Done" button. Task objects live in session_state, so id(task) is
+    # a stable button key across reruns. Completing a daily/weekly task
+    # auto-creates its next occurrence, so we rerun to pick up the new task.
+    for pet in owner.pets:
+        if pet_filter != "All pets" and pet.name != pet_filter:
+            continue
+
+        tasks = pet.tasks
+        if status_filter == "Pending":
+            tasks = scheduler.filter_by_status(tasks, completed=False)
+        elif status_filter == "Completed":
+            tasks = scheduler.filter_by_status(tasks, completed=True)
+        tasks = scheduler.sort_by_time(tasks)  # chronological order
+
         label = pet.name + (f" ({pet.species})" if pet.species else "")
         st.markdown(f"**{label}**")
-        if not pet.tasks:
-            st.caption("No tasks yet.")
-        for t_idx, task in enumerate(pet.tasks):
+        if not tasks:
+            st.caption("No tasks match this filter.")
+            continue
+
+        for task in tasks:
             text_col, button_col = st.columns([6, 1])
             if task.completed:
                 text_col.markdown(f"~~{task_label(task)}~~ ✓")
             else:
                 text_col.write(task_label(task))
-                if button_col.button("Done", key=f"done_{p_idx}_{t_idx}"):
+                if button_col.button("Done", key=f"done_{id(task)}"):
                     follow_up = task.complete()  # marks done + spawns next if recurring
                     if follow_up is not None:
                         msg = f"'{follow_up.description}' recurs — next one added"
@@ -139,23 +158,43 @@ if st.button("Generate schedule", type="primary", disabled=not owner.pets):
     m3.metric("Time free", f"{owner.available_time - plan.total_minutes} min")
 
     if plan.scheduled:
-        st.markdown("#### Plan")
-        # Lay the plan out as a chronological timeline (untimed tasks last).
-        for i, task in enumerate(Scheduler().sort_by_time(plan.scheduled), start=1):
-            pet_name = task.pet.name if task.pet else "household"
-            when = f"{task.start} · " if task.start else ""
-            st.write(f"{i}. {when}**[{task.priority.upper()}]** {task.description} "
-                     f"— {pet_name} ({task.duration} min)")
+        st.markdown("#### 📋 Plan (in time order)")
+        # Present the plan as a clean table, sorted chronologically.
+        timeline = Scheduler().sort_by_time(plan.scheduled)
+        st.table([
+            {
+                "Time": task.start or "anytime",
+                "Priority": task.priority.upper(),
+                "Task": task.description,
+                "Pet": task.pet.name if task.pet else "household",
+                "Min": task.duration,
+            }
+            for task in timeline
+        ])
     else:
-        st.warning("Nothing fits today's time budget.")
+        st.warning("Nothing fits today's time budget. Add more time in step 1.")
 
-    # Warn about any scheduled tasks whose times overlap. Reuse the same
-    # conflict_warnings() messages the terminal (main.py) prints, so both
-    # entry points report conflicts identically — pet names included.
+    # --- Conflict warnings -------------------------------------------------
+    # A time overlap is advice, not an error: we still show the full plan and
+    # flag each clash as a non-blocking warning that names both tasks and
+    # pets, the exact overlap window, and a concrete next step.
     if plan.has_conflicts():
-        st.warning(f"⏱ {len(plan.conflicts)} time conflict(s) detected:")
-        for message in Scheduler().conflict_warnings(plan.scheduled):
-            st.write("- " + message)
+        def _hhmm(minutes: int) -> str:
+            return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+        st.warning(f"⏱ {len(plan.conflicts)} time conflict(s) — some tasks overlap:")
+        for a, b in plan.conflicts:
+            pet_a = a.pet.name if a.pet else "household"
+            pet_b = b.pet.name if b.pet else "household"
+            overlap = f"{_hhmm(max(a.start_minutes(), b.start_minutes()))}" \
+                      f"–{_hhmm(min(a.end_minutes(), b.end_minutes()))}"
+            with st.container(border=True):
+                st.markdown(
+                    f"**{a.description}** ({pet_a}) and **{b.description}** ({pet_b}) "
+                    f"both need **{overlap}**."
+                )
+                st.caption("You can't be in two places at once — move one to a "
+                           "different time so both pets are covered.")
 
     # Flag anything that didn't fit — loudly for high-priority tasks.
     for task in plan.skipped_high_priority():
@@ -163,14 +202,19 @@ if st.button("Generate schedule", type="primary", disabled=not owner.pets):
 
     if plan.skipped:
         with st.expander(f"Didn't fit today ({len(plan.skipped)})"):
-            for task in plan.skipped:
-                pet_name = task.pet.name if task.pet else "household"
-                st.write(f"[{task.priority.upper()}] {task.description} "
-                         f"— {pet_name} ({task.duration} min)")
+            st.table([
+                {
+                    "Priority": task.priority.upper(),
+                    "Task": task.description,
+                    "Pet": task.pet.name if task.pet else "household",
+                    "Min": task.duration,
+                }
+                for task in plan.skipped
+            ])
 
 
 # --- Debug: peek inside st.session_state -----------------------------------
-# Watch this panel while you add pets/tasks and tick checkboxes — it shows
+# Watch this panel while you add pets/tasks and mark them done — it shows
 # exactly what Streamlit is remembering between reruns.
 with st.sidebar:
     st.header("🔍 session_state")

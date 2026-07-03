@@ -1,6 +1,7 @@
 classDiagram
-    %% PawPal+ initial UML design (4 classes: Owner, Pet, Task, Scheduler)
-    %% Keep this file updated so it matches your final implementation.
+    %% PawPal+ UML — updated to match the final implementation.
+    %% 5 classes: Owner, Pet, Task, Plan, Scheduler.
+    %% (Plan was added during implementation to carry the scheduling result.)
 
     class Owner {
         +str name
@@ -8,6 +9,7 @@ classDiagram
         +int available_time
         +list~Pet~ pets
         +add_pet(pet Pet) void
+        +remove_pet(pet Pet) bool
         +all_tasks() list~Task~
         +pending_tasks() list~Task~
     }
@@ -66,6 +68,8 @@ classDiagram
     Owner "1" --> "0..*" Pet : has
     Pet "1" --> "0..*" Task : has
     Task "0..*" --> "0..1" Pet : belongs to
-    Scheduler ..> Owner : uses
+    Task ..> Task : spawns next (next_occurrence / complete)
+    Scheduler ..> Owner : reads pending tasks
+    Scheduler ..> Task : sorts, filters, detects conflicts
     Scheduler ..> Plan : produces
     Plan "1" --> "0..*" Task : contains
