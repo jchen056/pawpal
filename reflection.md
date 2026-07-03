@@ -27,13 +27,25 @@ Yes — two changes came out of reviewing the first implementation:
 
 **a. Constraints and priorities**
 
-- What constraints does your scheduler consider (for example: time, priority, preferences)?
-- How did you decide which constraints mattered most?
+The scheduler works within one hard constraint — the owner's **available time** for the day (`available_time`, or an explicit `time_budget`). Everything has to fit inside that budget, so the core question is *which* tasks make the cut.
+
+To answer that, it considers three things, in order:
+
+1. **Due today (recurrence).** Before anything else, `due_tasks` drops tasks that don't belong to today — completed tasks, and recurring tasks whose next occurrence is a future date. There's no point weighing a task that isn't even on the calendar.
+2. **Priority.** `sort_tasks` orders what's left by `priority_rank` (high → medium → low), so the most important care happens first.
+3. **Duration, as a tie-breaker.** Within the same priority, shorter tasks go first. This lets the budget absorb more tasks overall, so a busy day fits three quick medium tasks rather than one long one.
+
+I decided time was the *most important* constraint because it's the real-world thing the owner can't change — a day only has so many minutes. Priority came second because when not everything fits, the owner cares most about *what* gets dropped, not just *how much*. I intentionally left `preferences` out of the scheduling math for now; it's stored on the `Owner` but isn't yet a factor, which keeps the logic simple and predictable.
+
+Time conflicts (two tasks whose clock times overlap) are treated as a *separate concern* from budget. `detect_conflicts` and `conflict_warnings` run after the plan is built and surface overlaps as warnings — the scheduler reports them rather than trying to resolve them.
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+The main tradeoff is that the scheduler uses a **greedy first-fit** (`pack_into_budget`): it walks the priority-sorted list once and takes each task if it still fits, rather than searching for the mathematically optimal combination of tasks. This can be sub-optimal — for example, one long high-priority task can consume the whole budget and crowd out several smaller tasks that together would have delivered more overall value (the classic knapsack problem).
+
+I think that tradeoff is reasonable here for two reasons. First, it matches how a person actually plans a day: you do the most important thing first and see what time is left, rather than solving an optimization problem in your head. Second, the scale is tiny — a pet owner has a handful of tasks, so the "wrong" greedy choice is rarely dramatic, and the code stays simple, fast, and easy to reason about. A full knapsack solver would add real complexity for a payoff most users would never notice.
+
+A second, related tradeoff is treating conflicts as **warnings rather than hard blocks**. Two tasks can both be scheduled even if their times overlap; the app flags it and trusts the owner to sort it out. That keeps the tool a helpful assistant instead of a rigid gatekeeper — the owner might genuinely intend to feed both pets at 9:00, and it's not the app's place to forbid it.
 
 ---
 

@@ -26,25 +26,41 @@ classDiagram
         +int duration
         +str recurrence
         +str priority
+        +str start
+        +int weekday
+        +date due_date
         +bool completed
         +Pet pet
         +is_recurring() bool
         +priority_rank() int
+        +start_minutes() int
+        +end_minutes() int
+        +due_today(today date) bool
+        +next_occurrence(today date) Task
         +mark_done() void
+        +complete(today date) Task
     }
 
     class Plan {
         +list~Task~ scheduled
         +list~Task~ skipped
+        +list~tuple~ conflicts
         +total_minutes() int
         +skipped_high_priority() list~Task~
+        +has_conflicts() bool
     }
 
     class Scheduler {
         +int time_budget
         +sort_tasks(tasks list~Task~) list~Task~
-        +filter_tasks(tasks list~Task~, budget int) tuple
-        +generate_plan(owner Owner) Plan
+        +sort_by_time(tasks list~Task~) list~Task~
+        +filter_by_pet(tasks list~Task~, pet_name str) list~Task~
+        +filter_by_status(tasks list~Task~, completed bool) list~Task~
+        +due_tasks(tasks list~Task~, today date) list~Task~
+        +detect_conflicts(tasks list~Task~) list~tuple~
+        +conflict_warnings(tasks list~Task~) list~str~
+        +pack_into_budget(tasks list~Task~, budget int) tuple
+        +generate_plan(owner Owner, today date) Plan
     }
 
     Owner "1" --> "0..*" Pet : has
