@@ -43,6 +43,16 @@ with st.form("add_pet", clear_on_submit=True):
         owner.add_pet(Pet(name=pet_name.strip(), species=species, breed=breed.strip()))
         st.success(f"Added {pet_name}.")
 
+# List the current pets, each with a Remove button. Removing a pet also
+# removes its tasks (they live on the pet), so we rerun to refresh the page.
+for p_idx, pet in enumerate(owner.pets):
+    label = pet.name + (f" ({pet.species})" if pet.species else "")
+    name_col, remove_col = st.columns([5, 1])
+    name_col.write(f"🐾 {label} — {len(pet.tasks)} task(s)")
+    if remove_col.button("Remove", key=f"remove_pet_{p_idx}"):
+        owner.remove_pet(pet)
+        st.rerun()
+
 if not owner.pets:
     st.info("No pets yet. Add one above to get started.")
 

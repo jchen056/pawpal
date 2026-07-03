@@ -79,6 +79,31 @@ def test_all_tasks_gathers_across_pets():
     assert len(owner.all_tasks()) == 2
 
 
+def test_remove_pet_removes_pet_and_its_tasks():
+    owner = Owner("Jia")
+    rex, milo = Pet("Rex"), Pet("Milo")
+    owner.add_pet(rex)
+    owner.add_pet(milo)
+    rex.add_task(Task("Walk", 20))
+    milo.add_task(Task("Feed", 10))
+
+    assert owner.remove_pet(rex) is True
+    assert rex not in owner.pets
+    assert owner.pets == [milo]
+    # Rex's tasks are gone from the owner's view too.
+    assert [t.description for t in owner.all_tasks()] == ["Feed"]
+
+
+def test_remove_pet_not_registered_returns_false():
+    owner = Owner("Jia")
+    kept = Pet("Rex")
+    owner.add_pet(kept)
+    stranger = Pet("Ghost")
+
+    assert owner.remove_pet(stranger) is False
+    assert owner.pets == [kept]  # nothing changed
+
+
 def test_owner_pending_tasks_excludes_completed():
     owner = Owner("Jia")
     pet = Pet("Rex")

@@ -198,6 +198,21 @@ class Owner:
         """Register a pet with the owner."""
         self.pets.append(pet)
 
+    def remove_pet(self, pet: Pet) -> bool:
+        """Unregister a pet (and, with it, all of its tasks).
+
+        Args:
+            pet: The pet to remove.
+
+        Returns:
+            True if the pet was found and removed, False if it wasn't
+            registered with this owner.
+        """
+        if pet in self.pets:
+            self.pets.remove(pet)
+            return True
+        return False
+
     def all_tasks(self) -> list[Task]:
         """Every task across all of the owner's pets."""
         return [task for pet in self.pets for task in pet.tasks]

@@ -60,19 +60,58 @@ Paste a sample of your app's CLI or Streamlit output here so a reader can see wh
 
 ## 🧪 Testing PawPal+
 
-```bash
-# Run the full test suite:
-pytest
+Run the full test suite from the project root:
 
-# Run with coverage:
-pytest --cov
+```bash
+python -m pytest
 ```
+
+The tests live in `tests/test_pawpal.py` and cover the logic layer end-to-end
+(43 tests):
+
+- **Task basics** — `is_recurring()`, `priority_rank()` ordering, unknown-priority
+  fallback, and `mark_done()`.
+- **Pet & Owner** — `add_task` sets the back-reference, `pending_tasks()` excludes
+  completed tasks, `all_tasks()` gathers across pets, and `remove_pet()` removes a
+  pet (and its tasks) while returning `False` for a pet that isn't registered.
+- **Sorting** — `sort_tasks()` (priority, then shorter first) and `sort_by_time()`
+  (chronological, untimed tasks last), plus `start_minutes()` / `end_minutes()`.
+- **Filtering** — `filter_by_pet()` and `filter_by_status()`.
+- **Recurring tasks** — `next_occurrence()` advances daily by 1 day and weekly by
+  7 (same weekday), one-offs return `None`; `complete()` marks done and auto-attaches
+  the follow-up; `due_today()` respects `due_date` so future occurrences stay off
+  today's plan.
+- **Conflict detection** — `detect_conflicts()` finds overlaps (and correctly treats
+  adjacent/untimed tasks as non-conflicting); `conflict_warnings()` returns messages
+  instead of crashing.
+- **Budget & Plan** — `pack_into_budget()` splits scheduled vs. skipped, and
+  `generate_plan()` prioritizes within budget, ignores completed/not-due tasks, honors
+  an explicit budget, and reports conflicts.
 
 Sample test output:
 
 ```
-# Paste your pytest output here
+============================= test session starts ==============================
+platform darwin -- Python 3.9.12, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/jchen056/pawpal
+collected 43 items
+
+tests/test_pawpal.py ...........................................         [100%]
+
+============================== 43 passed in 0.04s ==============================
 ```
+
+### Confidence Level: ★★★★☆ (4 / 5)
+
+All 43 tests pass and cover every scheduling behavior — sorting, filtering, budget
+packing, recurrence, and conflict detection — including edge cases like unknown
+priorities, adjacent (non-overlapping) times, and untimed tasks. I'm confident the
+**logic layer** is reliable.
+
+I held back the fifth star because the tests exercise `pawpal_system.py` directly, not
+the Streamlit UI in `app.py`; UI behavior (session-state persistence, the Done/Remove
+buttons) is currently verified by hand. I'd also want to add tests for malformed input
+(e.g. a bad `"HH:MM"` start time) before claiming full reliability.
 
 ## 📐 Smarter Scheduling
 
