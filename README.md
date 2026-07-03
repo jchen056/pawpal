@@ -22,6 +22,47 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
+## ✨ Features
+
+PawPal+ turns a list of pet-care tasks into a realistic daily plan. The scheduling
+"brain" lives in `pawpal_system.py`; the Streamlit app in `app.py` is the interface.
+Each feature maps to a method you can find in the code.
+
+**Planning**
+
+- **Priority-first budget packing** — fits the highest-priority tasks into the owner's
+  available minutes (greedy first-fit); shorter tasks break ties so more gets done.
+  (`Scheduler.sort_tasks`, `Scheduler.pack_into_budget`)
+- **Skip tracking** — tasks that don't fit aren't dropped silently; they're reported, and
+  skipped *high-priority* tasks are flagged loudly. (`Plan.skipped_high_priority`)
+
+**Sorting**
+
+- **Sorting by time** — arranges the day as a chronological timeline; untimed ("anytime")
+  tasks fall to the end. (`Scheduler.sort_by_time`)
+- **Sorting by priority** — high → medium → low, then shorter first. (`Scheduler.sort_tasks`)
+
+**Filtering**
+
+- **Filter by pet** — show just one pet's tasks. (`Scheduler.filter_by_pet`)
+- **Filter by status** — show pending vs. completed tasks. (`Scheduler.filter_by_status`)
+- **Due-today filter** — only tasks actually due today enter the plan.
+  (`Scheduler.due_tasks`, `Task.due_today`)
+
+**Conflict warnings**
+
+- **Overlap detection** — flags any two timed tasks whose windows overlap, across the same
+  *or* different pets. (`Scheduler.detect_conflicts`)
+- **Human-readable, non-crashing warnings** — returns warning messages (with pet names)
+  instead of erroring on a double-booking. (`Scheduler.conflict_warnings`)
+
+**Recurring tasks**
+
+- **Daily recurrence** — completing a daily task auto-creates the next one for tomorrow
+  (today + 1 day). (`Task.complete`, `Task.next_occurrence`)
+- **Weekly recurrence** — advances 7 days, preserving the weekday. (`Task.next_occurrence`)
+- **One-off tasks** — complete once and don't repeat.
+
 ## Getting started
 
 ### Setup
@@ -44,18 +85,25 @@ pip install -r requirements.txt
 
 ## 🖥️ Sample Output
 
-Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
+Running `python main.py` prints the generated schedule to the terminal. The plan is
+shown in time order, with the time used vs. available, anything that didn't fit, and any
+time conflicts:
 
 ```
- Today's Schedule — Jia
+             Today's Schedule — Jia
 ================================================
-1. [HIGH  ] Vet visit (Rex) ............. 50 min
-2. [MEDIUM] Feed (Milo) ................. 10 min
+1. 09:00–09:10 [HIGH  ] Litter box (Milo) .. 10 min
+2. 09:00–09:50 [HIGH  ] Vet visit (Rex) .. 50 min
 ------------------------------------------------
   Used 60 of 60 min   (0 min free)
 
-  Didn't fit today (1):
+  Didn't fit today (3):
+    [MEDIUM] Feed (Milo) - 10 min
+    [MEDIUM] Nail trim (Milo) - 15 min
     [LOW   ] Evening walk (Rex) - 20 min
+
+  ⏱  Time conflicts (1):
+    Litter box (09:00–09:10) overlaps Vet visit (09:00–09:50)
 ```
 
 ## 🧪 Testing PawPal+
@@ -177,14 +225,92 @@ Recurrence is date-driven via the `Task.due_date` field and Python's `timedelta`
 - **`Task.due_today(today)`** keeps a spawned occurrence off *today's* plan until its
   `due_date` arrives, so finishing today's "Feed" makes a fresh "Feed" appear for tomorrow.
 
-## 📸 Demo Walkthrough
+## 🎬 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+### The interface
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+Launch the web app with `streamlit run app.py`. The page is organized top-to-bottom as a
+four-step workflow, plus a debug sidebar:
+
+1. **Owner** — set your name and how many minutes you have available today.
+2. **Pets** — add a pet (name, species, optional breed); each pet is listed with a
+   **Remove** button and its task count.
+3. **Tasks** — add tasks for a pet (duration, priority, optional start time, and
+   recurrence: none / daily / weekly). Below the form you can **filter by pet** and
+   **filter by status** (All / Pending / Completed), and mark any task **Done**. Marking a
+   recurring task done strikes it through and automatically schedules its next occurrence.
+4. **Today's Schedule** — click **Generate schedule** to build the plan, shown as a table
+   in time order alongside how much time was used, any conflicts, and what didn't fit.
+
+**Actions a user can perform:** set available time · add / remove pets · add tasks with
+priority, time, and recurrence · filter the task list by pet or status · mark tasks done
+(auto-spawning the next recurring instance) · generate and read the daily schedule ·
+reset everything from the sidebar.
+
+### An example workflow
+
+1. In **Owner**, set available time to `60` minutes.
+2. In **Pets**, add `Rex` (dog) and `Milo` (cat).
+3. In **Tasks**, add `Vet visit` for Rex — 50 min, **high** priority, start `09:00`. Then
+   add `Litter box` for Milo — 10 min, **high**, start `09:00`, and `Feed` for Milo — 10
+   min, **medium**, **daily**.
+4. Click **Generate schedule**. PawPal+ packs the two high-priority tasks into the 60-minute
+   budget, lays them out in time order, warns that the two `09:00` tasks overlap, and lists
+   `Feed` under "Didn't fit today."
+5. Mark `Feed` **Done** — it strikes through and a fresh `Feed` appears dated tomorrow.
+
+### Key Scheduler behaviors shown
+
+- **Priority-first packing** — `Vet visit` and `Litter box` (both high) are scheduled;
+  the medium `Feed` is skipped when time runs out.
+- **Sorting by time** — the plan is displayed chronologically, not in entry order.
+- **Conflict warnings** — the two tasks that both start at `09:00` are flagged, with the
+  exact overlap window, rather than silently double-booked.
+- **Daily recurrence** — completing `Feed` auto-creates tomorrow's `Feed` (today + 1 day).
+
+### Sample CLI output (behaviors)
+
+Running `python main.py` also demonstrates the scheduler behaviors directly in the
+terminal. Beyond the schedule (see **Sample Output** above), it prints the sorting /
+filtering, conflict, and recurrence demos:
+
+```
+================================================
+            Sorting & filtering demo
+================================================
+
+Same tasks, sort_by_time() (untimed 'anytime' last):
+   07:30–07:45  Morning brush (Rex)  ✓ done
+   09:00–09:50  Vet visit (Rex)
+   09:00–09:10  Litter box (Milo)
+   09:30–09:40  Feed (Milo)
+   18:00–18:20  Evening walk (Rex)
+       anytime  Nail trim (Milo)
+
+filter_by_status(completed=False)  — still to do:
+   18:00–18:20  Evening walk (Rex)
+   09:00–09:50  Vet visit (Rex)
+   09:30–09:40  Feed (Milo)
+       anytime  Nail trim (Milo)
+   09:00–09:10  Litter box (Milo)
+
+================================================
+               Conflict detection
+================================================
+
+Found 2 conflict(s):
+   ⚠️  Conflict: 'Vet visit' (Rex, 09:00) overlaps 'Litter box' (Milo, 09:00)
+   ⚠️  Conflict: 'Vet visit' (Rex, 09:00) overlaps 'Feed' (Milo, 09:30)
+
+================================================
+            Recurring auto-complete
+================================================
+
+Completing 'Feed' (daily) on 2026-07-03 ...
+  → auto-created next 'Feed', now due 2026-07-04
+    (that's 2026-07-03 + 1 day)
+
+Completing one-off 'Nail trim' returns: None (nothing repeats).
+```
 
 **Screenshot or video** _(optional)_: <!-- Insert a screenshot or link to a demo video here -->

@@ -53,13 +53,17 @@ A second, related tradeoff is treating conflicts as **warnings rather than hard 
 
 **a. How you used AI**
 
-- How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
-- What kinds of prompts or questions were most helpful?
+AI was involved at essentially every stage — design, implementation, testing, refactoring, and documentation. My workflow was mostly: describe what I wanted at a high level, review what the AI produced, and course-correct. I came in with an initial UML sketch and the core ownership idea (Owner → Pet → Task), and the AI helped me develop it further — for example, splitting the scheduling result into its own `Plan` class and adding the family of `Scheduler` methods. It was especially strong at writing clean, well-documented code quickly and at generating thorough test cases, including edge cases I wouldn't have thought to check.
+
+The prompts that worked best were the specific, goal-oriented ones — naming the feature I wanted ("sort by time," "filter by pet/status," "recurring tasks," "conflict detection") rather than making vague requests. Asking the AI to "walk me through the current logic" was also useful for understanding code it had written before I built on top of it.
+
+Honestly, I ended up saying "yes" to a lot of the AI's ideas. The hardest part conceptually was the scheduling algorithm itself, and I didn't put a huge amount of my own thought into it — the AI proposed something functional (greedy, priority-first packing) and I accepted it. So at times I felt more like a director than an author.
 
 **b. Judgment and verification**
 
-- Describe one moment where you did not accept an AI suggestion as-is.
-- How did you evaluate or verify what the AI suggested?
+Even though I accepted a lot, there were moments I steered or pushed back. When the AI offered a long list of possible improvements, I didn't take all of them — I chose the specific features I wanted, and when it suggested two code simplifications I applied only the rename (`filter_tasks` → `pack_into_budget`) and skipped the other. I also caught a gap the AI hadn't filled on its own: I could *add* a pet but there was no way to *remove* one, so I asked for that.
+
+I verified the AI's work in two main ways: the automated test suite (which the AI wrote) had to pass, and I manually exercised the Streamlit app. One concrete moment stands out — after adding `remove_pet`, the app threw an `AttributeError` even though every test passed. That mismatch (green tests but a broken app) pushed me to find out *why* rather than assume it worked: it turned out to be a stale `Owner` object cached in Streamlit's session state, not a bug in the code. It was a good reminder that "the tests pass" isn't the same as "it works when you actually use it."
 
 ---
 
@@ -67,13 +71,15 @@ A second, related tradeoff is treating conflicts as **warnings rather than hard 
 
 **a. What you tested**
 
-- What behaviors did you test?
-- Why were these tests important?
+Testing happened on two levels. First, the AI wrote a suite of automated tests for the logic layer — before I even asked for them — covering sorting, filtering, budget packing, recurrence (daily / weekly / one-off), and conflict detection, along with assertions on edge cases. These verified the underlying logic in isolation, independent of the UI. Second, I manually tested scenarios by playing with the Streamlit app: adding pets and tasks, marking tasks done, generating schedules, and watching for conflicts.
+
+These tests mattered because the logic layer is the part that's easy to get subtly wrong (off-by-one budget math, a recurrence that spawns on the wrong day) and hard to eyeball. What I'd like to add next is an automated stress test that generates lots of random pets and tasks and checks that key invariants always hold — so a human doesn't have to click through the app by hand to feel confident.
 
 **b. Confidence**
 
-- How confident are you that your scheduler works correctly?
-- What edge cases would you test next if you had more time?
+I'm not very confident the scheduler is fully correct — not because I've watched it fail, but because the logic we implemented is intentionally simple and I didn't stress it hard. It does handle the obvious edge cases: an owner with no pets, a pet with no tasks, a zero-minute budget, and it correctly flags tasks whose times conflict.
+
+The main gap I can see is that it treats *every* time overlap as a conflict, when some overlaps are perfectly reasonable — for example, walking two dogs together, or feeding both pets at the same time. A smarter version would let the owner mark certain tasks as "can be done together" instead of warning about them. That's the first edge case I'd design and test for next.
 
 ---
 
@@ -81,12 +87,12 @@ A second, related tradeoff is treating conflicts as **warnings rather than hard 
 
 **a. What went well**
 
-- What part of this project are you most satisfied with?
+I'm most satisfied with the testing side. I was genuinely impressed that the AI could write so many test cases and assertion statements so quickly, and watching the suite grow — and stay green — as we added each feature was new to me. It gave the project a solid backbone and made me comfortable changing code without fear of quietly breaking something.
 
 **b. What you would improve**
 
-- If you had another iteration, what would you improve or redesign?
+In another iteration I'd focus on two things. First, smarter scheduling: moving beyond greedy first-fit to handle tasks that can happen together, time windows, and maybe genuinely optimal packing. Second, adding a database to persist users and their pets and tasks between sessions, instead of losing everything when the app resets. I'd also start from a clear roadmap — this time I mostly went step by step, and I think having the AI help me lay out a plan *before* implementing would make the work more deliberate and less reactive.
 
 **c. Key takeaway**
 
-- What is one important thing you learned about designing systems or working with AI on this project?
+My biggest takeaway is the value of planning before executing — a roadmap up front, plus tests as a safety net throughout. Working with AI, I also learned that "the AI wrote it and the tests pass" isn't the same as "I understand it and it works in the real app." My real job in this collaboration was to direct, verify, and catch the gaps the AI won't necessarily surface on its own — like the missing remove button, or the tests-pass-but-app-breaks moment.
